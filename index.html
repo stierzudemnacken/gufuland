@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>GUFULAND</title>
+<style>
+html, body {
+  margin: 0;
+  padding: 0;
+  overflow: hidden;
+  background: black;
+  font-family: Arial, sans-serif;
+}
+canvas {
+  width: 100vw;
+  height: 100vh;
+  display: block;
+  pointer-events: none;
+}
+#overlay {
+  position: absolute;
+  top:0; left:0;
+  width:100%; height:100%;
+  display:flex;
+  flex-direction: column;
+  justify-content:center;
+  align-items:center;
+  pointer-events:none;
+  color:white;
+  text-align:center;
+}
+#overlay h1 {
+  font-size: 8vw;
+  margin:0;
+  pointer-events:auto;
+}
+#overlay img, #overlay-embed {
+  display:none;
+  max-width: 80%;
+  width:800px;
+  height:auto;
+  margin-top: 2rem;
+}
+#overlay button {
+  margin-top: 2rem;
+  padding: 1rem 2rem;
+  /*font-size: 2rem;*/
+  background-color: rgba(255,255,255,0.2);
+  border: 2px solid white;
+  color:white;
+  cursor:pointer;
+  pointer-events:auto;
+  transition:0.3s;
+}
+#overlay button:hover { background-color: rgba(255,255,255,0.5); }
+#arrow-left, #arrow-right {
+  position: absolute;
+  top:50%;
+  font-size:3rem;
+  cursor:pointer;
+  pointer-events:auto;
+  user-select:none;
+  transition:0.2s;
+  color:white;
+}
+#arrow-left { left:20px; }
+#arrow-right { right:20px; }
+#arrow-left:hover, #arrow-right:hover { transform: scale(1.2); }
+#switch-shader {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  z-index: 20;
+
+  padding: 4px 8px !important;      /* kleiner */
+  font-size: 0.7rem !important;     /* kleiner Text */
+  line-height: 1 !important;
+  min-width: auto !important;
+
+  background-color: rgba(255,255,255,0.2);
+  border: 1px solid white;
+  color: white;
+  cursor: pointer;
+  text-align: center;
+  border-radius: 0;
+}
+
+#switch-shader:hover {
+  background-color: rgba(255,255,255,0.5);
+}
+
+#overlay-button {
+  font-size:2rem;
+}
+
+
+</style>
+</head>
+<body>
+
+<canvas id="glcanvas"></canvas>
+
+<div id="overlay">
+  <h1 id="overlay-title"></h1>
+  <img id="overlay-image" src="">
+  <div id="overlay-embed"></div>
+  <button id="overlay-button">ENTER</button>
+  <button id="switch-shader">Switch Shader</button>
+</div>
+
+<div id="arrow-left">&#9664;</div>
+<div id="arrow-right">&#9654;</div>
+
+<script>
+// ---------------- Canvas & WebGL ----------------
+const canvas = document.getElementById('glcanvas');
+const gl = canvas.getContext('webgl2');
+
+function resize() {
+  canvas.width = window.innerWidth;
+  canvas.height = window.innerHeight;
+  gl.viewport(0, 0, canvas.width, canvas.height);
+}
+window.addEventListener("resize", resize);
+resize();
+
+// Vertex Shader
+const vertexShaderSrc = `#version 300 es
+in vec2 position;
+void main() { gl_Position = vec4(position,0.0,1.0);}
+`;
+
+// ---------------- FRAGMENT SHADERS ----------------
+// Hier die Shader einfügen
+const fragmentShaders = [
+
+`#version 300 es
+precision highp float;
+out vec4 fragColor;
+uniform float iTime;
+uniform vec2 iResolution;
+
+const float pi = 3.14159265;
+
+void mainImage(out vec4 o, in vec2 fragCoord) {
+    vec2 r = iResolution.xy;
+    vec2 uv = (fragCoord.xy*2.0 - r) / r.y;
+    float t = iTime, d, i, z = 0.0;
+    
+    float focal = 1.4;
+    o = vec4(0.0, 0.0, 0.0, 1.0);
+    for(i = 0.0; i++ < 80.0;
+        o += (cos(d/0.1 + vec4(1.0,2.0,2.5,0.0)) + 1.0)/d * z)
+    {
+        vec3 p = z*normalize(vec3(uv, -focal)), q;
+
+        p.z = asin(sin((p.z-t)*0.25)) / 0.8;
+        p /= (1e-4 + 0.048*dot(p,p));
+        p.y += sin(p.z*2.0 + iTime*3.0)*0.3;
+
+        float T = 2.5*t - d*12.0;
+        float c = cos(T), s = sin(T);
+        q = p;
+        q.xy *= mat2(c,s,-s,c);
+
+        for(d=1.0; d++ < 9.0;) q += asin(sin(q*d + t*2.0)).yzx/d / (pi*0.5);
+
+        z += d = 0.1*abs(length(p)-3.0 - p.z*0.25) + abs(q.z)*0.1;
+    }
+
+    o = o / 1e4;
+}
+
+void main() {
+    mainImage(fragColor, gl_FragCoord.xy);
+}`,
+
+`#version 300 es
+precision highp float;
+out vec4 fragColor;
+uniform float iTime;
+uniform vec2 iResolution;
+
+#define O(f,Z,c) abs( c - length( \
+          p - vec3( sin( sin(p.z*f*.5 ) +T*.7 ) * 1.5 , \
+                    sin( sin(p.z*f*1.) +T*.5 ) * .5, \
+                    Z +5. +T*3. +cos(T*.5) *6. ) ) )
+
+void mainImage(out vec4 o, in vec2 fragCoord) {
+    float s,i,d,e, T = iTime;
+    vec3  p = vec3(iResolution,0.0);
+    vec2 u = fragCoord.xy;
+    u = ( u - p.xy/2. ) / p.y
+       + vec2(sin(T*.2)*.3,
+              sin(T*.5)*.1);
+    o = vec4(0.);
+    for(o*=i; i++ < 64.; o += 1. /s + 2e3*vec4(6,2,1,0)/e ) {
+        p = vec3( u*d, d+T*3. );
+        e = .01 + .8* min( O(1.3, 6., .1),
+                      min( O(1.1, 3., .13),
+                           O(1.2, 4., .16) ));
+        d += s = .6 * max(.001,
+                      min(e,
+                      max((sin(cos(p.z*.2))*2.+4.) - length(p.xy),
+                          dot(sin(p), cos(.3*T+p.yzx))  ) ) );
+    }
+    o = tanh(o/3e5);
+}
+
+void main() {
+  mainImage(fragColor, gl_FragCoord.xy);
+}`,
+
+`#version 300 es
+precision highp float;
+out vec4 fragColor;
+uniform float iTime;
+uniform vec2 iResolution;
+
+void mainImage(out vec4 o, in vec2 fragCoord){
+    vec2 u = fragCoord.xy;
+    vec3 p = vec3(iResolution, 0.);
+    float i, s, d = 0.01, t = iTime;
+
+    u = (u + u - p.xy) / p.y;
+    o = vec4(0.0);
+    for(i=0.; i<64.; i++){
+        p = vec3(u*d, d + t*2.);
+        p.z = cos(p.z*.3);
+        for(s=1.; s<9.; s++) p += sin(.2*t + p.yzx*s)*.3;
+        d += s = .01 + .9*abs(pow(dot(p=p*p*p*p,p),.015)-1.1);
+        o += (1.+cos(p.z+vec4(1,2,4,0)))/s;
+    }
+    o = tanh(o / 2e3);
+}
+
+void main() {
+    mainImage(fragColor, gl_FragCoord.xy);
+}`,
+
+`#version 300 es
+precision highp float;
+out vec4 fragColor;
+uniform float iTime;
+uniform vec2 iResolution;
+
+#define PI 3.1415926
+#define s1(v) (sin(v)*.5+.5)
+
+void mainImage(out vec4 O, in vec2 I){
+    vec2 R=iResolution.xy; vec2 uv=(I*2.-R)/R.y;
+    O.rgb=vec3(0); O.a=1.;
+    vec3 ro=vec3(0.,0.,-10.); vec3 rd=normalize(vec3(uv,1.));
+    float z=.1; vec3 col=vec3(0); float i=0.; vec3 C=vec3(3,2,1);
+    while(i++<50.){
+        vec3 p=ro+rd*z;
+        float d=abs(p.y)-1.; C+=dot(p,vec3(.01));
+        vec3 q=p; q.y+=iTime; q.z+=iTime*.5;
+        q+=cos(q.zxy*1.+iTime)*.6; q+=cos(q.zxy*2.)*.3; q.xz*=2.; q=cos(q*2.)/2.;
+        C+=dot(q,vec3(.03));
+        float d1=length(q.xz)-.6;
+        d=clamp(d,d1,0.3);
+        d=abs(d)*.4+.001;
+        col+=s1(C)*.2/d;
+        z+=d;
+    }
+    col=tanh(col/2e3);
+    O.rgb=col;
+}
+
+void main(){ mainImage(fragColor,gl_FragCoord.xy); }
+`,
+];
+
+let program;
+let shaderIndex = 0;
+let startTime = performance.now();
+
+function compileShader(type, src) {
+    const shader = gl.createShader(type);
+    gl.shaderSource(shader, src);
+    gl.compileShader(shader);
+    if(!gl.getShaderParameter(shader, gl.COMPILE_STATUS))
+        console.error(gl.getShaderInfoLog(shader));
+    return shader;
+}
+
+shaderIndex = parseInt(localStorage.getItem("shaderIndex")) || 0;
+
+function createProgram(fragSrc) {
+    if(program) gl.deleteProgram(program);
+
+    const vs = compileShader(gl.VERTEX_SHADER, vertexShaderSrc);
+    const fs = compileShader(gl.FRAGMENT_SHADER, fragSrc);
+
+    program = gl.createProgram();
+    gl.attachShader(program, vs);
+    gl.attachShader(program, fs);
+    gl.linkProgram(program);
+    gl.useProgram(program);
+
+    const buffer = gl.createBuffer();
+    gl.bindBuffer(gl.ARRAY_BUFFER, buffer);
+    gl.bufferData(gl.ARRAY_BUFFER, new Float32Array([
+        -1,-1, 1,-1, -1,1,
+        -1,1, 1,-1, 1,1
+    ]), gl.STATIC_DRAW);
+
+    const loc = gl.getAttribLocation(program,"position");
+    gl.enableVertexAttribArray(loc);
+    gl.vertexAttribPointer(loc,2,gl.FLOAT,false,0,0);
+}
+
+// initial program
+createProgram(fragmentShaders[shaderIndex]);
+
+// Shader-Wechsel Button
+document.getElementById("switch-shader").onclick = () => {
+    shaderIndex = (shaderIndex+1) % fragmentShaders.length;
+    createProgram(fragmentShaders[shaderIndex]);
+    localStorage.setItem("shaderIndex", shaderIndex);
+};
+
+// Render loop
+function render(t){
+    gl.useProgram(program);
+    gl.uniform1f(gl.getUniformLocation(program,"iTime"),(t-startTime)*0.001);
+    gl.uniform2f(gl.getUniformLocation(program,"iResolution"),canvas.width,canvas.height);
+    gl.drawArrays(gl.TRIANGLES,0,6);
+    requestAnimationFrame(render);
+}
+requestAnimationFrame(render);
+
+// ---------------- Overlay / Slides ----------------
+const slides = [
+    { type: "text", title: "GUFULAND", link: "https://untitled.stream/library/project/GEe5ZVVI8dOfBTOgkHAvg" },
+    { type: "image", src: "war.png", link: "https://untitled.stream/library/project/b67R14ix0rlvF4XK1ze8X" },
+    { type: "image", src: "bully.png", link: "https://untitled.stream/library/project/FpxZtwjZcQCE1M0ie2sKA" },
+    { type: "embed", src: "https://untitled.stream/embed/9u07g2cftc4y" }
+];
+
+// ----- Preload images und embeds -----
+slides.forEach(slide => {
+    if(slide.type === "image") {
+        const img = new Image();
+        img.src = slide.src;
+    }
+    if(slide.type === "embed") {
+        const iframe = document.createElement("iframe");
+        iframe.src = slide.src;
+        iframe.style.display = "none";   // verstecken
+        iframe.loading = "lazy";         // optional
+        document.body.appendChild(iframe);
+        slide._preloadedIframe = iframe;  // Referenz speichern
+    }
+});
+
+
+let currentSlide = 0;
+const titleEl = document.getElementById('overlay-title');
+const imgEl = document.getElementById('overlay-image');
+const buttonEl = document.getElementById('overlay-button');
+const embedEl = document.getElementById('overlay-embed');
+
+function showSlide(index){
+    currentSlide = (index + slides.length) % slides.length;
+    const slide = slides[currentSlide];
+
+    titleEl.style.display = "none";
+    imgEl.style.display = "none";
+    embedEl.style.display = "none";
+    buttonEl.style.display = "block";
+
+    if(slide.type==="text"){
+        titleEl.style.display="block";
+        imgEl.style.display="none";
+        titleEl.textContent = slide.title;
+    } else if(slide.type==="image"){
+        titleEl.style.display="none";
+        imgEl.style.display="block";
+        imgEl.src = slide.src;
+    } else if(slide.type==="embed"){
+        embedEl.style.display="block";
+        embedEl.innerHTML = `<iframe style="border-radius: 24px; width:100%; height:344px;" src="${slide.src}" allowfullscreen allow="picture-in-picture" frameborder="0" loading="lazy"></iframe>`;
+        buttonEl.style.display="none";
+    }
+
+    buttonEl.onclick = ()=>{ window.open(slide.link,"_blank"); };
+}
+
+// Pfeile
+document.getElementById('arrow-right').addEventListener('click', ()=>showSlide(currentSlide+1));
+document.getElementById('arrow-left').addEventListener('click', ()=>showSlide(currentSlide-1));
+
+// Touch Swipe
+let startX = null;
+window.addEventListener('touchstart', e=>{ startX = e.touches[0].clientX; });
+window.addEventListener('touchend', e=>{
+    if(startX===null) return;
+    let endX = e.changedTouches[0].clientX;
+    if(endX-startX>50) showSlide(currentSlide-1);
+    if(startX-endX>50) showSlide(currentSlide+1);
+    startX=null;
+});
+
+showSlide(0);
+</script>
+</body>
+</html>
