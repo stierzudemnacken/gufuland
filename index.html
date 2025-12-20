@@ -97,6 +97,27 @@ canvas {
 }
 
 
+
+</style>
+
+<style>
+#switch-shader {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  padding: 4px 8px;
+  font-size: 0.7rem;
+  line-height: 1;
+  background-color: rgba(255,255,255,0.2);
+  border: 1px solid white;
+  color: white;
+  cursor: pointer;
+  text-align: center;
+  border-radius: 0;
+
+  transition: opacity 0.5s ease; /* für sanftes Ein-/Ausfaden */
+  opacity: 1;
+}
 </style>
 </head>
 <body>
@@ -339,7 +360,10 @@ const slides = [
     { type: "text", title: "GUFULAND", link: "https://untitled.stream/library/project/GEe5ZVVI8dOfBTOgkHAvg" },
     { type: "image", src: "war.png", link: "https://untitled.stream/library/project/b67R14ix0rlvF4XK1ze8X" },
     { type: "image", src: "bully.png", link: "https://untitled.stream/library/project/FpxZtwjZcQCE1M0ie2sKA" },
-    { type: "embed", src: "https://untitled.stream/embed/9u07g2cftc4y" }
+    { type: "embed", src: "https://untitled.stream/embed/9u07g2cftc4y" },
+    { type: "embed", src: "https://untitled.stream/embed/ZMgkQwh5dYKB" },
+    { type: "embed", src: "https://untitled.stream/embed/6tf2njC8H8Dl" },
+    { type: "embed", src: "https://untitled.stream/embed/PChZSJEv1ioF" }
 ];
 
 // ----- Preload images und embeds -----
@@ -407,6 +431,34 @@ window.addEventListener('touchend', e=>{
 });
 
 showSlide(0);
+</script>
+
+
+<script>
+let fadeTimer;
+const shaderButton = document.getElementById("switch-shader");
+const fadeDelay = 2000; // ms bis zum Ausfaden
+
+function fadeOutButton() {
+  // nur ausblenden, wenn Maus nicht über dem Button ist
+  if (!shaderButton.matches(':hover')) {
+    shaderButton.style.opacity = "0"; // ausgeblendet
+  }
+}
+
+function fadeInButton() {
+  shaderButton.style.opacity = "1"; // wieder sichtbar
+}
+
+// Mausbewegung überwachen
+window.addEventListener("mousemove", () => {
+  fadeInButton();
+  clearTimeout(fadeTimer);
+  fadeTimer = setTimeout(fadeOutButton, fadeDelay);
+});
+
+// initial Timer starten
+fadeTimer = setTimeout(fadeOutButton, fadeDelay);
 </script>
 </body>
 </html>
